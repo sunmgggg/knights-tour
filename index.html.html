@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>열린학원 사고력 퀴즈</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Garamond', serif; background-color: #333; color: #f4f4f9; }
+        h1 { font-size: 36px; color: #ffe27a; margin-bottom: 15px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        button, select { padding: 10px 20px; font-size: 16px; border: 2px solid #c49a6c; border-radius: 10px; background-color: #6b4f34; color: #ffe27a; cursor: pointer; }
+        #board { display: grid; margin-top: 20px; padding: 10px; border-radius: 15px; display: none; }
+        .cell { width: 50px; height: 50px; border: 1px solid #ddd; display: flex; justify-content: center; align-items: center; font-size: 24px; background-color: #444; color: #fff; }
+        .cell.hint { background-color: #4caf50; }
+        .cell.visited { background-color: #795548; font-weight: bold; }
+        .info { margin-top: 10px; font-size: 16px; display: none; }
+        .instructions { max-width: 500px; margin-bottom: 20px; text-align: center; background-color: #222; padding: 15px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ 열린학원 사고력 퀴즈 🏰</h1>
+    <div class="instructions">
+        <h2>게임 방법</h2>
+        <p>🔹 기사는 L자 모양으로 이동할 수 있습니다.<br>
+           🔹 이미 방문한 칸은 다시 돌아갈 수 없습니다.<br>
+           🔹 뒤로 가기: 한 턴 뒤로 이동할 수 있지만, 방문했던 칸은 다시 사용할 수 없습니다.<br>
+           🔹 모든 칸을 방문해야 성공입니다.<br>
+           🔹 힌트: 이동할 수 있는 칸이 녹색으로 표시됩니다.<br>
+           🔹 게임 시작 버튼을 눌러 게임을 시작하세요.</p>
+    </div>
+    <div class="controls">
+        <label for="boardSize">체스판 크기 :</label>
+        <select id="boardSize">
+            <option value="5">5 × 5</option>
+            <option value="6">6 × 6</option>
+            <option value="7">7 × 7</option>
+            <option value="8" selected>8 × 8</option>
+            <option value="9">9 × 9</option>
+            <option value="10">10 × 10</option>
+        </select>
+        <button onclick="startGame()">⚔️ 게임 시작</button>
+        <button onclick="undoMove()">🔄 뒤로 가기</button>
+        <button onclick="resetGame()">🔁 게임 리셋</button>
+    </div>
+    <div id="board"></div>
+    <div class="info">
+        <p>이동 횟수: <span id="moveCount">0</span></p>
+        <p>시간: <span id="timer">0분 0초</span></p>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        let knightPos = { x: 0, y: 0 };
+        let moveHistory = [];
+        let visitedCells = new Set();
+        let moveCount = 0;
+        let timer;
+        let startTime;
+        let boardSize = 8;
+
+        function startGame() {
+            document.querySelector('.info').style.display = 'block';
+            board.style.display = 'grid';
+            boardSize = parseInt(document.getElementById('boardSize').value);
+            initializeBoard();
+        }
+
+        function initializeBoard() {
+            board.style.gridTemplateColumns = `repeat(${boardSize}, 50px)`;
+            board.style.gridTemplateRows = `repeat(${boardSize}, 50px)`;
+            board.innerHTML = '';
+            moveCount = 0;
+            moveHistory = [];
+            visitedCells.clear();
+            createBoard(boardSize);
+            placeKnight(0, 0);
+            startTime = new Date();
+            if (timer) clearInterval(timer);
+            timer = setInterval(updateTimer, 1000);
+        }
+
+        function createBoard(size) {
+            for (let row = 0; row < size; row++) {
+                for (let col = 0; col < size; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.addEventListener('click', () => moveKnight(row, col));
+                    cell.addEventListener('touchstart', () => moveKnight(row, col), { passive: true });
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        function placeKnight(x, y) {
+            const index = x * boardSize + y;
+            document.querySelectorAll('.cell').forEach(cell => cell.textContent = '');
+            document.querySelectorAll('.cell')[index].textContent = '♞';
+            knightPos = { x, y };
+        }
+
+        function moveKnight(row, col) {
+            const dx = Math.abs(knightPos.x - row);
+            const dy = Math.abs(knightPos.y - col);
+            if ((dx === 2 && dy === 1) || (dx === 1 && dy === 2)) {
+                if (visitedCells.has(`${row},${col}`)) return;
+
+                moveCount++;
+                moveHistory.push({ x: row, y: col });
+                visitedCells.add(`${row},${col}`);
+                placeKnight(row, col);
+                document.querySelectorAll('.cell')[row * boardSize + col].classList.add('visited');
+                document.getElementById('moveCount').innerText = moveCount;
+            }
+        }
+
+        function undoMove() {
+            if (moveHistory.length > 1) {
+                const lastMove = moveHistory.pop();
+                visitedCells.delete(`${lastMove.x},${lastMove.y}`);
+                moveCount--;
+                updateBoard();
+            }
+        }
+
+        function updateBoard() {
+            document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('visited'));
+            moveHistory.forEach(pos => {
+                const cell = document.querySelectorAll('.cell')[pos.x * boardSize + pos.y];
+                cell.classList.add('visited');
+            });
+            placeKnight(moveHistory[moveHistory.length - 1].x, moveHistory[moveHistory.length - 1].y);
+        }
+
+        function resetGame() {
+            initializeBoard();
+        }
+
+        function updateTimer() {
+            const now = new Date();
+            const elapsed = Math.floor((now - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('timer').innerText = `${minutes}분 ${seconds}초`;
+        }
+    </script>
+</body>
+</html>
